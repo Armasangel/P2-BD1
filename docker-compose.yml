@@ -1,17 +1,14 @@
 version: "3.8"
 
 services:
-  # ── Aplicacion Next.js (frontend + backend) ───────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=development
-      - JWT_SECRET=deposito_san_miguel_secret_key_dev
-      - DATABASE_URL=postgresql://dsm_user:dsm_password@db:5432/deposito_san_miguel
+    env_file:
+      - .env
     volumes:
       - .:/app
       - /app/node_modules
@@ -21,28 +18,27 @@ services:
         condition: service_healthy
     command: npm run dev
 
-  # ── PostgreSQL ─────────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: dsm_user
-      POSTGRES_PASSWORD: dsm_password
-      POSTGRES_DB: deposito_san_miguel
+      POSTGRES_USER: proy2
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: agrostock_db
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dsm_user -d deposito_san_miguel"]
+      test: ["CMD-SHELL", "pg_isready -U proy2 -d agrostock_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # ── pgAdmin ────────────────────────────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@dsm.com
+      PGADMIN_DEFAULT_EMAIL: admin@agrostock.com
       PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
       - "5050:80"

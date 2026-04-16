@@ -1,150 +1,136 @@
-# 🏪 Tienda San Miguel
-### Sistema de Gestión de Inventario y Ventas
-
-Proyecto desarrollado para la clase de Ingeniería de Software 1.  
-Sistema web para apoyar la gestión de inventario, ventas y pedidos de un negocio mayorista.
+# 🌱 AgroStock
+### Sistema de Gestión de Inventario y Ventas — cc3088 Bases de Datos 1
 
 ---
 
-## 👥 Equipo
+## 🚀 Levantar el proyecto
 
-| Nombre | Carné |
-|---|---|
-| Angel Antonio Armas Hernández | 24714 |
-| Esteban Alejandro Montenegro Berganza | 241262 |
-| Esteban Emilio Cumatz Quiná | 2449 |
-| Héctor Javier Dardón Sandoval | 241587 |
-| Jose Carlos Ovando Asencio | 24701 |
-
----
-
-## 🚀 Cómo ejecutar el proyecto
-
-### Requisitos previos
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y corriendo
-
-### Pasos
+**Requisitos:** Docker Desktop instalado y corriendo.
 
 ```bash
-# 1. Clona el repositorio
+# 1. Clonar el repositorio
 git clone <url-del-repo>
 cd <nombre-del-repo>
 
-# 2. Levanta todo con Docker (primera vez tarda ~2 min)
+# 2. Crear el archivo de entorno
+cp .env.example .env
+
+# 3. Levantar todo (primera vez ~2 min)
 docker compose up --build
 
-# 3. Para detenerlo
-docker compose down
+# Reiniciar sin reconstruir
+docker compose up
 ```
 
-Eso es todo. Docker levanta automáticamente:
-- La app Next.js en **http://localhost:3000**
-- PostgreSQL con la base de datos ya inicializada
-- pgAdmin en **http://localhost:5050**
+La aplicación queda disponible en **http://localhost:3000**
 
-> Si ya corriste el proyecto antes y solo quieres reiniciarlo sin reconstruir:
+> **Nota:** Si cambiaste datos en la BD y quieres reiniciar desde cero:
 > ```bash
-> docker compose up
+> docker compose down -v   # elimina el volumen
+> docker compose up --build
 > ```
 
 ---
 
 ## 🔐 Usuarios de prueba
 
-La base de datos se inicializa con estos usuarios. Contraseña para todos: **`password123`**
+Contraseña para todos: **`password123`**
 
-| Correo | Rol | Acceso |
-|---|---|---|
-| `dueno@tienda.com` | DUEÑO | Vista completa (precios unitario y mayoreo, stock) |
-| `empleado@tienda.com` | EMPLEADO | Vista de inventario y operaciones |
-| `maria@gmail.com` | COMPRADOR | Vista limitada del catálogo |
-
----
-
-## 🛠️ Stack tecnológico
-
-| Capa | Tecnología |
-|---|---|
-| Frontend + Backend | Next.js 14 (App Router) |
-| Base de datos | PostgreSQL 16 |
-| Autenticación | JWT (jsonwebtoken + bcryptjs) |
-| ORM / Queries | pg (node-postgres) |
-| Contenedores | Docker + Docker Compose |
-| Admin BD | pgAdmin 4 |
+| Correo                    | Rol       |
+|---------------------------|-----------|
+| `admin@agrostock.com`     | DUEÑO     |
+| `ana@agrostock.com`       | EMPLEADO  |
+| `luis@agrostock.com`      | EMPLEADO  |
+| `pedro@gmail.com`         | COMPRADOR |
 
 ---
 
-## 📁 Estructura del proyecto
+## 🗄️ Base de datos
+
+| Parámetro  | Valor            |
+|------------|------------------|
+| Usuario    | `proy2`          |
+| Contraseña | `secret`         |
+| Base       | `agrostock_db`   |
+| Puerto     | `5433` (host)    |
+
+**pgAdmin:** http://localhost:5050  
+Login: `admin@agrostock.com` / `admin123`
+
+Conexión en pgAdmin → Host: `db`, Port: `5432`, DB: `agrostock_db`, User: `proy2`, Pass: `secret`
+
+---
+
+## 🛠️ Stack
+
+| Capa            | Tecnología                    |
+|-----------------|-------------------------------|
+| Frontend+Backend| Next.js 14 (App Router)       |
+| Base de datos   | PostgreSQL 16                 |
+| Autenticación   | JWT (jsonwebtoken + bcryptjs) |
+| Queries         | SQL explícito via `pg`        |
+| Contenedores    | Docker + Docker Compose       |
+
+---
+
+## 📁 Estructura relevante
 
 ```
 ├── app/
 │   ├── api/
-│   │   ├── health/        → Verificar conexión a BD
-│   │   ├── login/         → Autenticación
-│   │   ├── productos/     → Listado de productos
-│   │   └── sesion/        → Sesión activa del usuario
-│   ├── dashboard/         → Panel principal (post-login)
-│   ├── inventario/        → Vista de inventario por rol
-│   ├── login/             → Página de inicio de sesión
-│   └── page.tsx           → Página de inicio
+│   │   ├── login/       → POST autenticación
+│   │   ├── logout/      → POST cerrar sesión
+│   │   ├── register/    → POST registro de usuario
+│   │   ├── sesion/      → GET sesión activa
+│   │   ├── stats/       → GET métricas dashboard
+│   │   ├── productos/   → GET/POST/PUT/DELETE productos
+│   │   ├── proveedores/ → GET/POST proveedores
+│   │   ├── ventas/      → GET/POST ventas (con transacción)
+│   │   ├── reportes/    → GET reportes con GROUP BY / CTE
+│   │   ├── deudores/    → GET vista v_deudores
+│   │   └── inventario/
+│   │       └── entrada/ → POST entrada de stock (transacción)
+│   ├── dashboard/       → Panel principal
+│   ├── inventario/      → Inventario por bodega
+│   ├── productos/       → CRUD de productos
+│   ├── ventas/          → Registro y listado de ventas
+│   ├── reportes/        → Reportes con exportación CSV
+│   ├── login/
+│   └── register/
 ├── lib/
-│   └── auth.ts            → Utilidades JWT y hashing
+│   └── auth.ts          → JWT + bcrypt helpers
 ├── init/
-│   └── 01_schema.sql      → Schema + datos de prueba (corre automático en Docker)
+│   └── 01_schema.sql    → DDL + índices + vistas + 25+ registros/tabla
 ├── docker-compose.yml
-└── Dockerfile
+└── .env.example
 ```
 
 ---
 
-## 🔗 URLs disponibles
+## ✅ Criterios cubiertos (rúbrica Proyecto 2)
 
-| URL | Descripción |
-|---|---|
-| http://localhost:3000 | Aplicación principal |
-| http://localhost:3000/login | Inicio de sesión |
-| http://localhost:3000/inventario | Inventario (requiere login) |
-| http://localhost:3000/api/health | Verificar conexión a PostgreSQL |
-| http://localhost:5050 | pgAdmin (admin@dsm.com / admin123) |
+### I. Diseño de BD
+- [x] DDL completo con PK, FK, NOT NULL
+- [x] 5 índices con `CREATE INDEX` justificados
+- [x] 2 vistas (`v_deudores`, `v_ventas_por_categoria`)
+- [x] 25+ registros por tabla en datos de prueba
+- [ ] Diagrama ER (ver `/docs/ER.png`)
+- [ ] Normalización documentada (ver `/docs/normalizacion.md`)
 
----
+### II. SQL (desde la app)
+- [x] JOINs múltiples (productos + categoría + marca + bodega)
+- [x] Subqueries con EXISTS / IN (productos bajo stock mínimo)
+- [x] GROUP BY + HAVING + agregaciones (reportes de ventas)
+- [x] CTE `WITH` (ranking de productos más vendidos)
+- [x] VIEW consumida por el backend (`v_deudores`)
+- [x] Transacción explícita con ROLLBACK (ventas, registro de stock)
 
-## 🗄️ Conectar pgAdmin a la base de datos
+### III. Aplicación web
+- [x] CRUD completo: Productos y Proveedores
+- [x] Reportes con datos reales visibles en UI
+- [x] Manejo de errores visible al usuario
+- [x] README funcional con docker compose up
 
-1. Entra a http://localhost:5050
-2. Login: `admin@dsm.com` / `admin123`
-3. Click derecho en "Servers" → Register → Server
-4. En la pestaña **General**: nombre `DSM`
-5. En la pestaña **Connection**:
-   - Host: `db`
-   - Port: `5432`
-   - Database: `deposito_san_miguel`
-   - Username: `dsm_user`
-   - Password: `dsm_password`
-
----
-
-## 📋 Funcionalidades implementadas (Sprint 1)
-
-- [x] **RF1** — Autenticación de usuarios con JWT
-- [x] **RF3** — Consulta de inventario diferenciada por rol
-- [x] Conexión a PostgreSQL desde Next.js
-- [x] Schema completo de base de datos con datos de prueba
-- [x] Sesión persistente con cookies HttpOnly
-
-## 🚧 En desarrollo (próximos sprints)
-
-- [ ] **RF2** — Registro de nuevos productos
-- [ ] **RF4** — Registro de entrada de inventario (Kardex)
-- [ ] **RF6** — Gestión de precios (supervisor)
-- [ ] **RF7** — Registro y gestión de clientes
-- [ ] **RF9** — Generación de facturas
-- [ ] **RF11** — Registro de métodos de pago
-
----
-
-## ⚠️ Notas de desarrollo
-
-- Las contraseñas en `init/01_schema.sql` son hashes bcrypt solo para desarrollo
-- El `JWT_SECRET` en `docker-compose.yml` debe cambiarse en producción
-- La carpeta `init/` contiene el schema SQL que Docker ejecuta automáticamente al crear el contenedor por primera vez
+### IV. Avanzado
+- [x] Autenticación login/logout con sesión JWT
+- [x] Exportar reporte a CSV
