@@ -6,7 +6,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export async function GET() {
   try {
     const result = await pool.query(`
-      SELECT id_usuario, nombre, correo, tipo_usuario
+      SELECT correo, contrasena_hash
       FROM usuario
       WHERE estado_usuario = TRUE
       ORDER BY tipo_usuario, nombre

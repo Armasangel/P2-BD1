@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       tipo_usuario: string
       contrasena_hash: string
     }>(
-      `SELECT id_usuario, nombre, correo, tipo_usuario, contrasena_hash
+      `SELECT correo, contrasena_hash
        FROM usuario
        WHERE LOWER(correo) = LOWER($1) AND estado_usuario = TRUE`,
       [username]

@@ -3,7 +3,7 @@
 --  Corre automáticamente al crear el contenedor por primera vez.
 -- ============================================================
 
--- ── TABLAS ───────────────────────────────────────────────────
+-- TABLAS 
 
 CREATE TABLE categoria (
     id_categoria     SERIAL        PRIMARY KEY,
@@ -143,19 +143,14 @@ CREATE TABLE factura (
     CONSTRAINT fk_factura_venta  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
 );
 
--- ── ÍNDICES ──────────────────────────────────────────────────
--- Búsquedas por nombre de producto (filtros, autocomplete)
+-- ÍNDICES 
 CREATE INDEX idx_producto_nombre    ON producto(nombre_producto);
--- Consultas de inventario por bodega (pantalla más frecuente)
 CREATE INDEX idx_bp_bodega          ON bodega_producto(id_bodega);
--- Historial de kardex por producto y fecha
 CREATE INDEX idx_kardex_prod_fecha  ON kardex(id_producto, fecha_movimiento);
--- Reportes de ventas filtrados por estado y fecha
 CREATE INDEX idx_venta_estado_fecha ON venta(estado_venta, fecha_venta);
--- Login: búsqueda de usuario por correo
 CREATE INDEX idx_usuario_correo     ON usuario(correo);
 
--- ── VISTAS ───────────────────────────────────────────────────
+-- VISTAS 
 
 CREATE VIEW v_deudores AS
 SELECT
@@ -186,7 +181,7 @@ JOIN categoria c ON c.id_categoria = p.id_categoria
 JOIN venta     v ON v.id_venta     = dv.id_venta
 GROUP BY c.nombre_categoria;
 
--- ── DATOS DE PRUEBA ──────────────────────────────────────────
+-- DATOS DE PRUEBA
 
 INSERT INTO categoria (nombre_categoria) VALUES
     ('Fertilizantes'), ('Herbicidas'), ('Insecticidas'), ('Fungicidas'),
@@ -290,12 +285,14 @@ INSERT INTO kardex (id_bodega, id_producto, tipo_movimiento, cantidad, descripci
     (3, 24, 'ENTRADA', 350, 'Compra inicial'),
     (3, 25, 'ENTRADA', 600, 'Compra inicial');
 
-INSERT INTO venta (id_usuario, id_empleado, estado_venta, tipo_venta, tipo_entrega, total, fecha_limite_pago) VALUES
-    (4, 2, 'PAGADO',     'MINORISTA', 'EN_TIENDA',  473.00, '2026-03-15'),
-    (5, 2, 'ENTREGADO',  'MAYORISTA', 'DOMICILIO',  980.00, '2026-04-01'),
-    (6, 3, 'PENDIENTE',  'MINORISTA', 'EN_TIENDA',  227.50, '2026-04-20'),
-    (4, 3, 'CONFIRMADO', 'MAYORISTA', 'DOMICILIO', 1560.00, '2026-04-30'),
-    (5, 2, 'PENDIENTE',  'MINORISTA', 'EN_TIENDA',  318.00, '2026-05-05');
+-- VENTAS DE PRUEBA (corregidas)
+-- Las ventas con DOMICILIO ahora incluyen direccion_entrega (requerido por el CHECK)
+INSERT INTO venta (id_usuario, id_empleado, estado_venta, tipo_venta, tipo_entrega, direccion_entrega, total, fecha_limite_pago) VALUES
+    (4, 2, 'PAGADO',     'MINORISTA', 'EN_TIENDA', NULL,                              473.00, '2026-03-15'),
+    (5, 2, 'ENTREGADO',  'MAYORISTA', 'DOMICILIO', 'Aldea San José, San Marcos',      980.00, '2026-04-01'),
+    (6, 3, 'PENDIENTE',  'MINORISTA', 'EN_TIENDA', NULL,                              227.50, '2026-04-20'),
+    (4, 3, 'CONFIRMADO', 'MAYORISTA', 'DOMICILIO', 'Zona 3, Quetzaltenango',         1560.00, '2026-04-30'),
+    (5, 2, 'PENDIENTE',  'MINORISTA', 'EN_TIENDA', NULL,                              318.00, '2026-05-05');
 
 INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal) VALUES
     (1,  1, 1, 185.00, 185.00),
