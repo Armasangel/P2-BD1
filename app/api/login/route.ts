@@ -19,13 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await pool.query<{
-      id_usuario: number
-      nombre: string
-      correo: string
-      tipo_usuario: string
-      contrasena_hash: string
+      id_usuario: number;
+      nombre: string;
+      correo: string;
+      tipo_usuario: string;
+      contrasena_hash: string;
     }>(
-      `SELECT correo, contrasena_hash
+      `SELECT id_usuario, nombre, correo, tipo_usuario, contrasena_hash
        FROM usuario
        WHERE LOWER(correo) = LOWER($1) AND estado_usuario = TRUE`,
       [username]
@@ -36,14 +36,15 @@ export async function POST(req: NextRequest) {
     }
 
     const row = result.rows[0];
+
     if (!verifyPassword(password, row.contrasena_hash)) {
       return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 });
     }
 
     const usuario = {
-      id_usuario: row.id_usuario,
-      nombre: row.nombre,
-      correo: row.correo,
+      id_usuario:  row.id_usuario,
+      nombre:      row.nombre,
+      correo:      row.correo,
       tipo_usuario: row.tipo_usuario,
     };
 
