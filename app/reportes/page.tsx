@@ -2,16 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const NAV = [
-  { href: "/dashboard",          icon: "◈", label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/proveedores",        icon: "🚚", label: "Proveedores"  },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-  { href: "/reportes",           icon: "📊", label: "Reportes"     },
-];
+import { getNav, ROL_COLOR, ROL_LABEL } from "@/lib/nav";
 
 type ReporteData = {
   ventas_detalle:        any[];
@@ -24,7 +15,6 @@ type ReporteData = {
   ventas_por_categoria:  any[];
 };
 
-// Convierte array de objetos a CSV y descarga
 function exportCSV(data: any[], filename: string) {
   if (!data.length) return;
   const headers = Object.keys(data[0]);
@@ -57,6 +47,8 @@ export default function ReportesPage() {
   useEffect(() => {
     fetch("/api/sesion").then(r => r.json()).then(d => {
       if (!d.usuario) { router.replace("/login"); return; }
+      // Solo DUENO puede ver reportes
+      if (d.usuario.tipo_usuario !== "DUENO") { router.replace("/dashboard"); return; }
       setUsuario(d.usuario);
     });
     fetch("/api/reportes")
@@ -65,15 +57,15 @@ export default function ReportesPage() {
       .catch(() => { setError("Error al cargar reportes"); setLoading(false); });
   }, []);
 
-  async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
-  }
-
   if (!usuario) return <div style={{ padding: "2rem", color: "var(--muted)" }}>Cargando…</div>;
 
+  const nav      = getNav(usuario.tipo_usuario);
+  const rolColor = ROL_COLOR[usuario.tipo_usuario] ?? "var(--muted)";
+  const rolLabel = ROL_LABEL[usuario.tipo_usuario] ?? usuario.tipo_usuario;
+  const inicial  = usuario.nombre[0]?.toUpperCase() ?? "?";
+
   const tabs = [
-    { label: "🏆 Ranking productos",   key: "ranking_productos"     },
+    { label: "🏆 Ranking productos",    key: "ranking_productos"     },
     { label: "📂 Ventas por categoría", key: "ventas_por_categoria"  },
     { label: "👥 Ventas por empleado",  key: "ventas_por_empleado"   },
     { label: "🧾 Detalle de ventas",    key: "ventas_detalle"        },
@@ -86,61 +78,49 @@ export default function ReportesPage() {
   const currentKey  = tabs[tab].key as keyof ReporteData;
   const currentData = data ? data[currentKey] : [];
 
-  // Descripciones SQL de cada reporte para mostrar qué tipo de consulta usa
   const sqlInfo: Record<string, { tipo: string; color: string; desc: string }> = {
-    ranking_productos:    { tipo: "CTE (WITH) + RANK()",    color: "var(--accent)", desc: "Usa WITH … AS para calcular totales y luego RANK() OVER para posicionar productos por ingresos." },
-    ventas_por_categoria: { tipo: "VIEW",                   color: "var(--blue)",   desc: "Consume directamente la vista v_ventas_por_categoria definida en el esquema con JOIN + GROUP BY." },
-    ventas_por_empleado:  { tipo: "GROUP BY + HAVING + AGG",color: "var(--green)",  desc: "Agrupa ventas por empleado usando COUNT, SUM, AVG, MAX. HAVING filtra empleados con al menos 1 venta." },
-    ventas_detalle:       { tipo: "JOIN múltiple (3 tablas)",color: "var(--accent)", desc: "JOIN entre venta, usuario (cliente), usuario (empleado) y detalle_venta para mostrar información completa." },
-    stock_bajo:           { tipo: "JOIN múltiple (5 tablas)",color: "var(--blue)",   desc: "JOIN entre bodega_producto, producto, categoria, marca y bodega para identificar déficit de stock." },
-    kardex:               { tipo: "JOIN múltiple",           color: "var(--green)",  desc: "JOIN entre kardex, producto y bodega para mostrar el historial de movimientos con nombres legibles." },
-    clientes_activos:     { tipo: "Subquery EXISTS",         color: "var(--accent)", desc: "Filtra clientes usando WHERE EXISTS (SELECT 1 FROM venta WHERE …) — subquery correlacionado." },
-    productos_no_vendidos:{ tipo: "Subquery NOT IN",         color: "var(--blue)",   desc: "Encuentra productos usando WHERE id_producto NOT IN (SELECT DISTINCT id_producto FROM detalle_venta)." },
+    ranking_productos:    { tipo: "CTE (WITH) + RANK()",     color: "var(--accent)", desc: "Usa WITH … AS para calcular totales y luego RANK() OVER para posicionar productos por ingresos." },
+    ventas_por_categoria: { tipo: "VIEW",                    color: "var(--blue)",   desc: "Consume directamente la vista v_ventas_por_categoria definida en el esquema con JOIN + GROUP BY." },
+    ventas_por_empleado:  { tipo: "GROUP BY + HAVING + AGG", color: "var(--green)",  desc: "Agrupa ventas por empleado usando COUNT, SUM, AVG, MAX. HAVING filtra empleados con al menos 1 venta." },
+    ventas_detalle:       { tipo: "JOIN múltiple (3 tablas)", color: "var(--accent)", desc: "JOIN entre venta, usuario (cliente), usuario (empleado) y detalle_venta para mostrar información completa." },
+    stock_bajo:           { tipo: "JOIN múltiple (5 tablas)", color: "var(--blue)",   desc: "JOIN entre bodega_producto, producto, categoria, marca y bodega para identificar déficit de stock." },
+    kardex:               { tipo: "JOIN múltiple",            color: "var(--green)",  desc: "JOIN entre kardex, producto y bodega para mostrar el historial de movimientos con nombres legibles." },
+    clientes_activos:     { tipo: "Subquery EXISTS",          color: "var(--accent)", desc: "Filtra clientes usando WHERE EXISTS (SELECT 1 FROM venta WHERE …) — subquery correlacionado." },
+    productos_no_vendidos:{ tipo: "Subquery NOT IN",          color: "var(--blue)",   desc: "Encuentra productos usando WHERE id_producto NOT IN (SELECT DISTINCT id_producto FROM detalle_venta)." },
   };
 
   const info = sqlInfo[currentKey];
 
   return (
     <div style={s.shell}>
-      {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.sidebarTop}>
-          <div style={s.sidebarLogo}>
-            <span>🌱</span>
-            <span style={s.sidebarLogoText}>AgroStock</span>
-          </div>
+          <div style={s.sidebarLogo}><span>🌱</span><span style={s.sidebarLogoText}>AgroStock</span></div>
           <nav style={s.nav}>
-            {NAV.map(item => (
-              <Link key={item.href} href={item.href} style={{
-                ...s.navLink,
-                ...(item.href === "/reportes" ? s.navLinkActive : {}),
-              }}>
-                <span style={s.navIcon}>{item.icon}</span>
-                <span>{item.label}</span>
+            {nav.map(item => (
+              <Link key={item.href} href={item.href} style={{ ...s.navLink, ...(item.href === "/reportes" ? s.navLinkActive : {}) }}>
+                <span style={s.navIcon}>{item.icon}</span><span>{item.label}</span>
               </Link>
             ))}
           </nav>
         </div>
         <div style={s.sidebarBottom}>
           <div style={s.userBadge}>
-            <div style={s.userAvatar}>{usuario.nombre[0]}</div>
+            <div style={{ ...s.userAvatar, background: rolColor }}>{inicial}</div>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 500, color: "var(--text)" }}>{usuario.nombre}</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--accent)" }}>{usuario.tipo_usuario}</div>
+              <div style={{ fontSize: "0.72rem", color: rolColor }}>{rolLabel}</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={s.logoutBtn}>← Salir</button>
+          <button onClick={async () => { await fetch("/api/logout", { method: "POST" }); router.replace("/login"); }} style={s.logoutBtn}>← Salir</button>
         </div>
       </aside>
 
-      {/* Main */}
       <main style={s.main}>
         <div style={s.topbar}>
           <div>
             <h1 style={s.pageTitle}>Reportes</h1>
-            <p style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
-              Consultas analíticas en tiempo real desde la base de datos
-            </p>
+            <p style={{ color: "var(--muted)", fontSize: "0.88rem" }}>Consultas analíticas en tiempo real desde la base de datos</p>
           </div>
           <button
             onClick={() => exportCSV(currentData, `${currentKey}_${Date.now()}.csv`)}
@@ -153,30 +133,21 @@ export default function ReportesPage() {
 
         {error && <div style={s.errorBox}>⚠️ {error}</div>}
 
-        {/* Tabs */}
         <div style={s.tabsWrap}>
           {tabs.map((t, i) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(i)}
-              style={{ ...s.tabBtn, ...(tab === i ? s.tabBtnActive : {}) }}
-            >
+            <button key={t.key} onClick={() => setTab(i)} style={{ ...s.tabBtn, ...(tab === i ? s.tabBtnActive : {}) }}>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* SQL badge */}
         {info && (
           <div style={{ ...s.sqlBadge, borderColor: info.color + "44" }}>
-            <span style={{ ...s.sqlTag, background: info.color + "22", color: info.color }}>
-              {info.tipo}
-            </span>
+            <span style={{ ...s.sqlTag, background: info.color + "22", color: info.color }}>{info.tipo}</span>
             <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>{info.desc}</span>
           </div>
         )}
 
-        {/* Tabla dinámica */}
         {loading ? (
           <div style={{ padding: "3rem", textAlign: "center", color: "var(--muted)" }}>Cargando datos…</div>
         ) : !currentData?.length ? (
@@ -191,7 +162,6 @@ export default function ReportesPage() {
   );
 }
 
-// Tabla genérica que renderiza cualquier array de objetos
 function DynamicTable({ data }: { data: any[] }) {
   if (!data.length) return null;
   const headers = Object.keys(data[0]);
@@ -199,39 +169,25 @@ function DynamicTable({ data }: { data: any[] }) {
   const formatVal = (key: string, val: any) => {
     if (val === null || val === undefined) return <span style={{ color: "var(--muted)" }}>—</span>;
     const s = String(val);
-    // Montos
-    if (["total", "monto_total", "ingresos_totales", "total_venta", "deuda_pendiente", "total_pagado", "precio_unitario", "ticket_promedio", "venta_maxima", "subtotal"].includes(key)) {
+    if (["total", "monto_total", "ingresos_totales", "total_venta", "deuda_pendiente", "total_pagado", "precio_unitario", "ticket_promedio", "venta_maxima", "subtotal"].includes(key))
       return `Q${Number(val).toFixed(2)}`;
-    }
-    // Fechas
     if (key.includes("fecha")) return new Date(val).toLocaleDateString("es-GT");
-    // Booleanos
     if (typeof val === "boolean") return val ? "✅" : "❌";
-    // Ranking
     if (key === "ranking") return <span style={{ fontWeight: 700, color: "var(--accent)" }}>#{val}</span>;
-    // Estado venta
     const estadoColors: Record<string, string> = { PAGADO: "var(--green)", PENDIENTE: "var(--accent)", CONFIRMADO: "var(--blue)", ENTREGADO: "var(--muted)" };
-    if (key === "estado_venta" && estadoColors[s]) {
+    if (key === "estado_venta" && estadoColors[s])
       return <span style={{ color: estadoColors[s], fontWeight: 500 }}>{s}</span>;
-    }
     return s;
   };
 
-  const friendlyHeader = (h: string) =>
-    h.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  const friendlyHeader = (h: string) => h.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.86rem" }}>
       <thead>
         <tr>
           {headers.map(h => (
-            <th key={h} style={{
-              padding: "0.7rem 1rem", textAlign: "left",
-              borderBottom: "1px solid var(--border)",
-              color: "var(--muted)", fontSize: "0.75rem",
-              fontWeight: 600, textTransform: "uppercase",
-              letterSpacing: "0.05em", whiteSpace: "nowrap",
-            }}>
+            <th key={h} style={{ padding: "0.7rem 1rem", textAlign: "left", borderBottom: "1px solid var(--border)", color: "var(--muted)", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
               {friendlyHeader(h)}
             </th>
           ))}
@@ -241,11 +197,7 @@ function DynamicTable({ data }: { data: any[] }) {
         {data.map((row, i) => (
           <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,.02)" }}>
             {headers.map(h => (
-              <td key={h} style={{
-                padding: "0.7rem 1rem",
-                borderBottom: "1px solid var(--border)",
-                color: "var(--text)", verticalAlign: "middle",
-              }}>
+              <td key={h} style={{ padding: "0.7rem 1rem", borderBottom: "1px solid var(--border)", color: "var(--text)", verticalAlign: "middle" }}>
                 {formatVal(h, row[h])}
               </td>
             ))}
@@ -268,7 +220,7 @@ const s: Record<string, React.CSSProperties> = {
   navIcon:      { fontSize: "1rem", width: 20, textAlign: "center" },
   sidebarBottom:{ padding: "1rem", borderTop: "1px solid var(--border)" },
   userBadge:    { display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.8rem" },
-  userAvatar:   { width: 32, height: 32, borderRadius: "50%", background: "var(--accent)", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
+  userAvatar:   { width: 32, height: 32, borderRadius: "50%", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
   logoutBtn:    { width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", padding: "0.45rem 0.75rem", fontSize: "0.82rem", cursor: "pointer", textAlign: "left" },
   main:         { flex: 1, padding: "2rem", overflowY: "auto" },
   topbar:       { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" },

@@ -3,49 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getNav, ROL_COLOR, ROL_LABEL, NavItem } from "@/lib/nav";
 
 type Usuario = { id_usuario: number; nombre: string; correo: string; tipo_usuario: string };
-
-const NAV_DUENO = [
-  { href: "/dashboard",          icon: "◈",  label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/proveedores",        icon: "🚚", label: "Proveedores"  },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-  { href: "/reportes",           icon: "📊", label: "Reportes"     },
-];
-
-const NAV_EMPLEADO = [
-  { href: "/dashboard",          icon: "◈",  label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-];
-
-const NAV_COMPRADOR = [
-  { href: "/dashboard", icon: "◈",  label: "Dashboard"   },
-  { href: "/ventas",    icon: "🧾", label: "Mis pedidos" },
-];
-
-function getNav(tipo: string) {
-  if (tipo === "DUENO")    return NAV_DUENO;
-  if (tipo === "EMPLEADO") return NAV_EMPLEADO;
-  return NAV_COMPRADOR;
-}
-
-const ROL_COLOR: Record<string, string> = {
-  DUENO:     "var(--accent)",
-  EMPLEADO:  "var(--blue)",
-  COMPRADOR: "var(--green)",
-};
-
-const ROL_LABEL: Record<string, string> = {
-  DUENO:     "Dueño",
-  EMPLEADO:  "Empleado",
-  COMPRADOR: "Comprador",
-};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -95,8 +55,12 @@ export default function DashboardPage() {
         { label: "Proveedores",        value: stats.proveedores, icon: "🚚", color: "var(--muted)"  },
       ];
 
+  // Acciones rápidas = todos los ítems del nav excepto Dashboard
+  const quickActions = nav.filter(item => item.href !== "/dashboard");
+
   return (
     <div style={s.shell}>
+      {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.sidebarTop}>
           <div style={s.sidebarLogo}>
@@ -127,6 +91,7 @@ export default function DashboardPage() {
         </div>
       </aside>
 
+      {/* Main */}
       <main style={s.main}>
         <div style={s.topbar}>
           <div>
@@ -159,7 +124,7 @@ export default function DashboardPage() {
         <div style={s.section}>
           <h2 style={s.sectionTitle}>Acciones rápidas</h2>
           <div style={s.actionsGrid}>
-            {nav.slice(1).map(item => (
+            {quickActions.map(item => (
               <Link key={item.href} href={item.href} style={s.actionCard}>
                 <span style={{ fontSize: "1.8rem" }}>{item.icon}</span>
                 <span style={{ fontWeight: 500, color: "var(--text)" }}>{item.label}</span>
@@ -174,7 +139,19 @@ export default function DashboardPage() {
             <div>
               <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.25rem" }}>Cuenta de Comprador</div>
               <div style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
-                Puedes ver y realizar pedidos. Para acceso de gestión, contacta al administrador.
+                Puedes ver el catálogo y realizar pedidos desde "Mis pedidos".
+              </div>
+            </div>
+          </div>
+        )}
+
+        {usuario.tipo_usuario === "EMPLEADO" && (
+          <div style={{ ...s.infoBox, borderColor: "rgba(88,166,255,.3)", background: "rgba(88,166,255,.06)" }}>
+            <span style={{ fontSize: "1.2rem" }}>👷</span>
+            <div>
+              <div style={{ fontWeight: 600, color: "var(--blue)", marginBottom: "0.25rem" }}>Acceso de Empleado</div>
+              <div style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
+                Puedes gestionar productos, registrar entradas de stock y procesar ventas.
               </div>
             </div>
           </div>
@@ -186,7 +163,7 @@ export default function DashboardPage() {
             <div>
               <div style={{ fontWeight: 600, color: "var(--accent)", marginBottom: "0.25rem" }}>Acceso completo</div>
               <div style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
-                Tienes acceso a todas las funciones del sistema.
+                Tienes acceso a todas las funciones del sistema incluyendo reportes y proveedores.
               </div>
             </div>
           </div>

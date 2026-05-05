@@ -2,34 +2,27 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const NAV = [
-  { href: "/dashboard",          icon: "◈", label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/proveedores",        icon: "🚚", label: "Proveedores"  },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-  { href: "/reportes",           icon: "📊", label: "Reportes"     },
-];
+import { getNav, ROL_COLOR, ROL_LABEL } from "@/lib/nav";
 
 const EMPTY = { nombre_proveedor: "", nit_proveedor: "", correo_contacto: "", telefono: "", estado_proveedor: true };
 
 export default function ProveedoresPage() {
   const router = useRouter();
-  const [usuario, setUsuario]       = useState<any>(null);
+  const [usuario, setUsuario]         = useState<any>(null);
   const [proveedores, setProveedores] = useState<any[]>([]);
-  const [modal, setModal]           = useState(false);
-  const [form, setForm]             = useState<any>(EMPTY);
-  const [editId, setEditId]         = useState<number | null>(null);
-  const [error, setError]           = useState("");
-  const [success, setSuccess]       = useState("");
-  const [loading, setLoading]       = useState(false);
-  const [busqueda, setBusqueda]     = useState("");
+  const [modal, setModal]             = useState(false);
+  const [form, setForm]               = useState<any>(EMPTY);
+  const [editId, setEditId]           = useState<number | null>(null);
+  const [error, setError]             = useState("");
+  const [success, setSuccess]         = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [busqueda, setBusqueda]       = useState("");
 
   useEffect(() => {
     fetch("/api/sesion").then(r => r.json()).then(d => {
       if (!d.usuario) { router.replace("/login"); return; }
+      // Solo DUENO puede ver proveedores
+      if (d.usuario.tipo_usuario !== "DUENO") { router.replace("/dashboard"); return; }
       setUsuario(d.usuario);
     });
     cargarDatos();
@@ -41,9 +34,7 @@ export default function ProveedoresPage() {
     setProveedores(data.proveedores || []);
   }
 
-  function abrirCrear() {
-    setForm(EMPTY); setEditId(null); setError(""); setModal(true);
-  }
+  function abrirCrear() { setForm(EMPTY); setEditId(null); setError(""); setModal(true); }
 
   function abrirEditar(p: any) {
     setForm({
@@ -64,12 +55,8 @@ export default function ProveedoresPage() {
     try {
       const url    = editId ? `/api/proveedores/${editId}` : "/api/proveedores";
       const method = editId ? "PUT" : "POST";
-      const res    = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
+      const res    = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const data   = await res.json();
       if (!res.ok) { setError(data.error || "Error al guardar"); return; }
       setSuccess(editId ? "Proveedor actualizado ✅" : "Proveedor creado ✅");
       setModal(false);
@@ -92,11 +79,6 @@ export default function ProveedoresPage() {
     setTimeout(() => setSuccess(""), 3000);
   }
 
-  async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
-  }
-
   const filtrados = proveedores.filter(p =>
     p.nombre_proveedor.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.nit_proveedor.toLowerCase().includes(busqueda.toLowerCase())
@@ -104,40 +86,36 @@ export default function ProveedoresPage() {
 
   if (!usuario) return <div style={{ padding: "2rem", color: "var(--muted)" }}>Cargando…</div>;
 
+  const nav      = getNav(usuario.tipo_usuario);
+  const rolColor = ROL_COLOR[usuario.tipo_usuario] ?? "var(--muted)";
+  const rolLabel = ROL_LABEL[usuario.tipo_usuario] ?? usuario.tipo_usuario;
+  const inicial  = usuario.nombre[0]?.toUpperCase() ?? "?";
+
   return (
     <div style={s.shell}>
-      {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.sidebarTop}>
-          <div style={s.sidebarLogo}>
-            <span>🌱</span>
-            <span style={s.sidebarLogoText}>AgroStock</span>
-          </div>
+          <div style={s.sidebarLogo}><span>🌱</span><span style={s.sidebarLogoText}>AgroStock</span></div>
           <nav style={s.nav}>
-            {NAV.map(item => (
-              <Link key={item.href} href={item.href} style={{
-                ...s.navLink,
-                ...(item.href === "/proveedores" ? s.navLinkActive : {}),
-              }}>
-                <span style={s.navIcon}>{item.icon}</span>
-                <span>{item.label}</span>
+            {nav.map(item => (
+              <Link key={item.href} href={item.href} style={{ ...s.navLink, ...(item.href === "/proveedores" ? s.navLinkActive : {}) }}>
+                <span style={s.navIcon}>{item.icon}</span><span>{item.label}</span>
               </Link>
             ))}
           </nav>
         </div>
         <div style={s.sidebarBottom}>
           <div style={s.userBadge}>
-            <div style={s.userAvatar}>{usuario.nombre[0]}</div>
+            <div style={{ ...s.userAvatar, background: rolColor }}>{inicial}</div>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 500, color: "var(--text)" }}>{usuario.nombre}</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--accent)" }}>{usuario.tipo_usuario}</div>
+              <div style={{ fontSize: "0.72rem", color: rolColor }}>{rolLabel}</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={s.logoutBtn}>← Salir</button>
+          <button onClick={async () => { await fetch("/api/logout", { method: "POST" }); router.replace("/login"); }} style={s.logoutBtn}>← Salir</button>
         </div>
       </aside>
 
-      {/* Main */}
       <main style={s.main}>
         <div style={s.topbar}>
           <div>
@@ -177,9 +155,7 @@ export default function ProveedoresPage() {
                   <td style={s.td}>{p.correo_contacto || <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td style={s.td}>{p.telefono || <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td style={{ ...s.td, textAlign: "center" }}>
-                    <span style={{ ...s.badge, background: "rgba(88,166,255,.12)", color: "var(--blue)" }}>
-                      {p.total_productos}
-                    </span>
+                    <span style={{ ...s.badge, background: "rgba(88,166,255,.12)", color: "var(--blue)" }}>{p.total_productos}</span>
                   </td>
                   <td style={s.td}>
                     <span style={{ ...s.badge, background: p.estado_proveedor ? "rgba(63,185,80,.15)" : "rgba(248,81,73,.15)", color: p.estado_proveedor ? "var(--green)" : "var(--red)" }}>
@@ -201,7 +177,6 @@ export default function ProveedoresPage() {
         </div>
       </main>
 
-      {/* Modal */}
       {modal && (
         <div style={s.overlay} onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div style={s.modalBox}>
@@ -209,7 +184,6 @@ export default function ProveedoresPage() {
               <h2 style={s.modalTitle}>{editId ? "Editar proveedor" : "Nuevo proveedor"}</h2>
               <button onClick={() => setModal(false)} style={s.closeBtn}>✕</button>
             </div>
-
             <form onSubmit={handleSubmit} style={s.form}>
               <div style={s.formGrid}>
                 <div style={{ gridColumn: "1 / -1" }}>
@@ -238,9 +212,7 @@ export default function ProveedoresPage() {
                   </div>
                 )}
               </div>
-
               {error && <div style={s.errorBox}>⚠️ {error}</div>}
-
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
                 <button type="button" onClick={() => setModal(false)} style={s.btnSecondary}>Cancelar</button>
                 <button type="submit" disabled={loading} style={{ ...s.btnPrimary, opacity: loading ? 0.7 : 1 }}>
@@ -256,42 +228,42 @@ export default function ProveedoresPage() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  shell:       { display: "flex", minHeight: "100vh", fontFamily: "var(--font-body)" },
-  sidebar:     { width: 220, flexShrink: 0, background: "var(--surface)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh" },
-  sidebarTop:  { padding: "1.5rem 1rem" },
-  sidebarLogo: { display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "2rem" },
+  shell:        { display: "flex", minHeight: "100vh", fontFamily: "var(--font-body)" },
+  sidebar:      { width: 220, flexShrink: 0, background: "var(--surface)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh" },
+  sidebarTop:   { padding: "1.5rem 1rem" },
+  sidebarLogo:  { display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "2rem" },
   sidebarLogoText: { fontFamily: "var(--font-head)", fontSize: "1.2rem", fontWeight: 800, color: "var(--accent)" },
-  nav:         { display: "flex", flexDirection: "column", gap: "0.2rem" },
-  navLink:     { display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.55rem 0.75rem", borderRadius: 8, color: "var(--muted)", fontSize: "0.88rem", textDecoration: "none" },
-  navLinkActive: { background: "rgba(232,160,69,.12)", color: "var(--accent)" },
-  navIcon:     { fontSize: "1rem", width: 20, textAlign: "center" },
-  sidebarBottom: { padding: "1rem", borderTop: "1px solid var(--border)" },
-  userBadge:   { display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.8rem" },
-  userAvatar:  { width: 32, height: 32, borderRadius: "50%", background: "var(--accent)", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
-  logoutBtn:   { width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", padding: "0.45rem 0.75rem", fontSize: "0.82rem", cursor: "pointer", textAlign: "left" },
-  main:        { flex: 1, padding: "2rem", overflowY: "auto" },
-  topbar:      { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" },
-  pageTitle:   { fontFamily: "var(--font-head)", fontSize: "1.6rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.2rem" },
-  btnPrimary:  { background: "var(--accent)", color: "#0d1117", border: "none", borderRadius: 8, padding: "0.6rem 1.2rem", fontFamily: "var(--font-head)", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" },
-  btnSecondary:{ background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 1.2rem", fontSize: "0.9rem", cursor: "pointer" },
-  btnEdit:     { background: "rgba(88,166,255,.12)", color: "var(--blue)", border: "1px solid rgba(88,166,255,.25)", borderRadius: 6, padding: "0.3rem 0.7rem", fontSize: "0.8rem", cursor: "pointer" },
-  btnDel:      { background: "rgba(248,81,73,.1)", color: "var(--red)", border: "1px solid rgba(248,81,73,.25)", borderRadius: 6, padding: "0.3rem 0.7rem", fontSize: "0.8rem", cursor: "pointer" },
-  search:      { width: "100%", maxWidth: 400, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 1rem", color: "var(--text)", fontSize: "0.9rem", outline: "none", marginBottom: "1rem" },
-  successBox:  { background: "rgba(63,185,80,.12)", border: "1px solid rgba(63,185,80,.3)", borderRadius: 8, padding: "0.75rem 1rem", color: "var(--green)", marginBottom: "1rem", fontSize: "0.9rem" },
-  errorBox:    { background: "rgba(248,81,73,.1)", border: "1px solid rgba(248,81,73,.3)", borderRadius: 8, padding: "0.7rem 1rem", color: "var(--red)", fontSize: "0.85rem", marginTop: "0.5rem" },
-  tableWrap:   { overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 },
-  table:       { width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" },
-  th:          { padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--border)", color: "var(--muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" },
-  td:          { padding: "0.75rem 1rem", borderBottom: "1px solid var(--border)", color: "var(--text)", verticalAlign: "middle" },
-  badge:       { display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: 20, fontSize: "0.75rem", fontWeight: 500 },
-  code:        { fontFamily: "monospace", fontSize: "0.82rem", background: "var(--surface2)", padding: "0.15rem 0.4rem", borderRadius: 4, color: "var(--accent)" },
-  overlay:     { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" },
-  modalBox:    { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto", padding: "1.75rem" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
-  modalTitle:  { fontFamily: "var(--font-head)", fontSize: "1.2rem", fontWeight: 700, color: "var(--text)" },
-  closeBtn:    { background: "transparent", border: "none", color: "var(--muted)", fontSize: "1.1rem", cursor: "pointer" },
-  form:        { display: "flex", flexDirection: "column", gap: "1rem" },
-  formGrid:    { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" },
-  label:       { display: "block", fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500, marginBottom: "0.35rem" },
-  input:       { background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 0.8rem", color: "var(--text)", fontSize: "0.9rem", outline: "none", width: "100%" },
+  nav:          { display: "flex", flexDirection: "column", gap: "0.2rem" },
+  navLink:      { display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.55rem 0.75rem", borderRadius: 8, color: "var(--muted)", fontSize: "0.88rem", textDecoration: "none" },
+  navLinkActive:{ background: "rgba(232,160,69,.12)", color: "var(--accent)" },
+  navIcon:      { fontSize: "1rem", width: 20, textAlign: "center" },
+  sidebarBottom:{ padding: "1rem", borderTop: "1px solid var(--border)" },
+  userBadge:    { display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.8rem" },
+  userAvatar:   { width: 32, height: 32, borderRadius: "50%", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
+  logoutBtn:    { width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", padding: "0.45rem 0.75rem", fontSize: "0.82rem", cursor: "pointer", textAlign: "left" },
+  main:         { flex: 1, padding: "2rem", overflowY: "auto" },
+  topbar:       { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" },
+  pageTitle:    { fontFamily: "var(--font-head)", fontSize: "1.6rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.2rem" },
+  btnPrimary:   { background: "var(--accent)", color: "#0d1117", border: "none", borderRadius: 8, padding: "0.6rem 1.2rem", fontFamily: "var(--font-head)", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" },
+  btnSecondary: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 1.2rem", fontSize: "0.9rem", cursor: "pointer" },
+  btnEdit:      { background: "rgba(88,166,255,.12)", color: "var(--blue)", border: "1px solid rgba(88,166,255,.25)", borderRadius: 6, padding: "0.3rem 0.7rem", fontSize: "0.8rem", cursor: "pointer" },
+  btnDel:       { background: "rgba(248,81,73,.1)", color: "var(--red)", border: "1px solid rgba(248,81,73,.25)", borderRadius: 6, padding: "0.3rem 0.7rem", fontSize: "0.8rem", cursor: "pointer" },
+  search:       { width: "100%", maxWidth: 400, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 1rem", color: "var(--text)", fontSize: "0.9rem", outline: "none", marginBottom: "1rem" },
+  successBox:   { background: "rgba(63,185,80,.12)", border: "1px solid rgba(63,185,80,.3)", borderRadius: 8, padding: "0.75rem 1rem", color: "var(--green)", marginBottom: "1rem", fontSize: "0.9rem" },
+  errorBox:     { background: "rgba(248,81,73,.1)", border: "1px solid rgba(248,81,73,.3)", borderRadius: 8, padding: "0.7rem 1rem", color: "var(--red)", fontSize: "0.85rem", marginTop: "0.5rem" },
+  tableWrap:    { overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 },
+  table:        { width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" },
+  th:           { padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--border)", color: "var(--muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" },
+  td:           { padding: "0.75rem 1rem", borderBottom: "1px solid var(--border)", color: "var(--text)", verticalAlign: "middle" },
+  badge:        { display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: 20, fontSize: "0.75rem", fontWeight: 500 },
+  code:         { fontFamily: "monospace", fontSize: "0.82rem", background: "var(--surface2)", padding: "0.15rem 0.4rem", borderRadius: 4, color: "var(--accent)" },
+  overlay:      { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "1rem" },
+  modalBox:     { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto", padding: "1.75rem" },
+  modalHeader:  { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
+  modalTitle:   { fontFamily: "var(--font-head)", fontSize: "1.2rem", fontWeight: 700, color: "var(--text)" },
+  closeBtn:     { background: "transparent", border: "none", color: "var(--muted)", fontSize: "1.1rem", cursor: "pointer" },
+  form:         { display: "flex", flexDirection: "column", gap: "1rem" },
+  formGrid:     { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" },
+  label:        { display: "block", fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500, marginBottom: "0.35rem" },
+  input:        { background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.6rem 0.8rem", color: "var(--text)", fontSize: "0.9rem", outline: "none", width: "100%" },
 };

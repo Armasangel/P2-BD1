@@ -2,16 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const NAV = [
-  { href: "/dashboard",          icon: "◈", label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/proveedores",        icon: "🚚", label: "Proveedores"  },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-  { href: "/reportes",           icon: "📊", label: "Reportes"     },
-];
+import { getNav, ROL_COLOR, ROL_LABEL } from "@/lib/nav";
 
 const EMPTY = {
   codigo_producto: "", nombre_producto: "", precio_unitario: "",
@@ -36,6 +27,8 @@ export default function ProductosPage() {
   useEffect(() => {
     fetch("/api/sesion").then(r => r.json()).then(d => {
       if (!d.usuario) { router.replace("/login"); return; }
+      // Solo DUENO y EMPLEADO pueden ver esta página
+      if (d.usuario.tipo_usuario === "COMPRADOR") { router.replace("/pedidos"); return; }
       setUsuario(d.usuario);
     });
     cargarDatos();
@@ -108,11 +101,6 @@ export default function ProductosPage() {
     setTimeout(() => setSuccess(""), 3000);
   }
 
-  async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
-  }
-
   const productosFiltrados = productos.filter(p =>
     p.nombre_producto.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.codigo_producto.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -120,6 +108,11 @@ export default function ProductosPage() {
   );
 
   if (!usuario) return <div style={{ padding: "2rem", color: "var(--muted)" }}>Cargando…</div>;
+
+  const nav      = getNav(usuario.tipo_usuario);
+  const rolColor = ROL_COLOR[usuario.tipo_usuario] ?? "var(--muted)";
+  const rolLabel = ROL_LABEL[usuario.tipo_usuario] ?? usuario.tipo_usuario;
+  const inicial  = usuario.nombre[0]?.toUpperCase() ?? "?";
 
   return (
     <div style={s.shell}>
@@ -131,7 +124,7 @@ export default function ProductosPage() {
             <span style={s.sidebarLogoText}>AgroStock</span>
           </div>
           <nav style={s.nav}>
-            {NAV.map(item => (
+            {nav.map(item => (
               <Link key={item.href} href={item.href} style={{
                 ...s.navLink,
                 ...(item.href === "/productos" ? s.navLinkActive : {}),
@@ -144,13 +137,13 @@ export default function ProductosPage() {
         </div>
         <div style={s.sidebarBottom}>
           <div style={s.userBadge}>
-            <div style={s.userAvatar}>{usuario.nombre[0]}</div>
+            <div style={{ ...s.userAvatar, background: rolColor }}>{inicial}</div>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 500, color: "var(--text)" }}>{usuario.nombre}</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--accent)" }}>{usuario.tipo_usuario}</div>
+              <div style={{ fontSize: "0.72rem", color: rolColor }}>{rolLabel}</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={s.logoutBtn}>← Salir</button>
+          <button onClick={async () => { await fetch("/api/logout", { method: "POST" }); router.replace("/login"); }} style={s.logoutBtn}>← Salir</button>
         </div>
       </aside>
 
@@ -168,7 +161,6 @@ export default function ProductosPage() {
 
         {success && <div style={s.successBox}>{success}</div>}
 
-        {/* Buscador */}
         <input
           placeholder="Buscar por nombre, código o categoría…"
           value={busqueda}
@@ -176,7 +168,6 @@ export default function ProductosPage() {
           style={s.search}
         />
 
-        {/* Tabla */}
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
@@ -232,10 +223,10 @@ export default function ProductosPage() {
 
             <form onSubmit={handleSubmit} style={s.form}>
               <div style={s.formGrid}>
-                <Field label="Código *" required>
+                <Field label="Código *">
                   <input style={s.input} value={form.codigo_producto} onChange={e => setForm({ ...form, codigo_producto: e.target.value })} placeholder="FER-001" required />
                 </Field>
-                <Field label="Nombre *" required>
+                <Field label="Nombre *">
                   <input style={s.input} value={form.nombre_producto} onChange={e => setForm({ ...form, nombre_producto: e.target.value })} placeholder="Urea 46% 50kg" required />
                 </Field>
                 <Field label="Categoría *">
@@ -296,7 +287,7 @@ export default function ProductosPage() {
   );
 }
 
-function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
       <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500 }}>{label}</label>
@@ -317,7 +308,7 @@ const s: Record<string, React.CSSProperties> = {
   navIcon:     { fontSize: "1rem", width: 20, textAlign: "center" },
   sidebarBottom: { padding: "1rem", borderTop: "1px solid var(--border)" },
   userBadge:   { display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.8rem" },
-  userAvatar:  { width: 32, height: 32, borderRadius: "50%", background: "var(--accent)", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
+  userAvatar:  { width: 32, height: 32, borderRadius: "50%", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
   logoutBtn:   { width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", padding: "0.45rem 0.75rem", fontSize: "0.82rem", cursor: "pointer", textAlign: "left" },
   main:        { flex: 1, padding: "2rem", overflowY: "auto" },
   topbar:      { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" },

@@ -2,16 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const NAV = [
-  { href: "/dashboard",          icon: "◈", label: "Dashboard"    },
-  { href: "/inventario",         icon: "📦", label: "Inventario"   },
-  { href: "/inventario/entrada", icon: "⬇",  label: "Entrada stock" },
-  { href: "/productos",          icon: "🌿", label: "Productos"    },
-  { href: "/proveedores",        icon: "🚚", label: "Proveedores"  },
-  { href: "/ventas",             icon: "🧾", label: "Ventas"       },
-  { href: "/reportes",           icon: "📊", label: "Reportes"     },
-];
+import { getNav, ROL_COLOR, ROL_LABEL } from "@/lib/nav";
 
 const ESTADO_COLORS: Record<string, string> = {
   PENDIENTE:  "var(--accent)",
@@ -47,6 +38,7 @@ export default function VentasPage() {
   useEffect(() => {
     fetch("/api/sesion").then(r => r.json()).then(d => {
       if (!d.usuario) { router.replace("/login"); return; }
+      if (d.usuario.tipo_usuario === "COMPRADOR") { router.replace("/pedidos"); return; }
       setUsuario(d.usuario);
     });
     cargarDatos();
@@ -81,8 +73,6 @@ export default function VentasPage() {
   function updateItem(i: number, field: keyof Item, value: string) {
     const newItems = [...items];
     newItems[i] = { ...newItems[i], [field]: value };
-
-    // Auto-rellenar precio al seleccionar producto
     if (field === "id_producto" && value) {
       const prod = productos.find(p => String(p.id_producto) === value);
       if (prod) {
@@ -95,21 +85,18 @@ export default function VentasPage() {
   }
 
   const total = items.reduce((sum, item) => {
-    const subtotal = Number(item.cantidad || 0) * Number(item.precio_unitario || 0);
-    return sum + subtotal;
+    return sum + Number(item.cantidad || 0) * Number(item.precio_unitario || 0);
   }, 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
-
     const itemsValidos = items.filter(i => i.id_producto && i.cantidad && i.precio_unitario);
     if (itemsValidos.length === 0) {
       setError("Agrega al menos 1 producto con cantidad y precio");
       setLoading(false);
       return;
     }
-
     try {
       const res = await fetch("/api/ventas", {
         method: "POST",
@@ -119,8 +106,8 @@ export default function VentasPage() {
           id_usuario:  Number(form.id_usuario),
           id_empleado: form.id_empleado ? Number(form.id_empleado) : null,
           items: itemsValidos.map(i => ({
-            id_producto:    Number(i.id_producto),
-            cantidad:       Number(i.cantidad),
+            id_producto:     Number(i.id_producto),
+            cantidad:        Number(i.cantidad),
             precio_unitario: Number(i.precio_unitario),
           })),
         }),
@@ -138,63 +125,52 @@ export default function VentasPage() {
     }
   }
 
-  async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
-  }
-
   const clientes  = usuarios.filter(u => u.tipo_usuario === "COMPRADOR");
   const empleados = usuarios.filter(u => ["EMPLEADO", "DUENO"].includes(u.tipo_usuario));
 
   if (!usuario) return <div style={{ padding: "2rem", color: "var(--muted)" }}>Cargando…</div>;
 
+  const nav      = getNav(usuario.tipo_usuario);
+  const rolColor = ROL_COLOR[usuario.tipo_usuario] ?? "var(--muted)";
+  const rolLabel = ROL_LABEL[usuario.tipo_usuario] ?? usuario.tipo_usuario;
+  const inicial  = usuario.nombre[0]?.toUpperCase() ?? "?";
+
   return (
     <div style={s.shell}>
-      {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.sidebarTop}>
-          <div style={s.sidebarLogo}>
-            <span>🌱</span><span style={s.sidebarLogoText}>AgroStock</span>
-          </div>
+          <div style={s.sidebarLogo}><span>🌱</span><span style={s.sidebarLogoText}>AgroStock</span></div>
           <nav style={s.nav}>
-            {NAV.map(item => (
-              <Link key={item.href} href={item.href} style={{
-                ...s.navLink,
-                ...(item.href === "/ventas" ? s.navLinkActive : {}),
-              }}>
-                <span style={s.navIcon}>{item.icon}</span>
-                <span>{item.label}</span>
+            {nav.map(item => (
+              <Link key={item.href} href={item.href} style={{ ...s.navLink, ...(item.href === "/ventas" ? s.navLinkActive : {}) }}>
+                <span style={s.navIcon}>{item.icon}</span><span>{item.label}</span>
               </Link>
             ))}
           </nav>
         </div>
         <div style={s.sidebarBottom}>
           <div style={s.userBadge}>
-            <div style={s.userAvatar}>{usuario.nombre[0]}</div>
+            <div style={{ ...s.userAvatar, background: rolColor }}>{inicial}</div>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 500, color: "var(--text)" }}>{usuario.nombre}</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--accent)" }}>{usuario.tipo_usuario}</div>
+              <div style={{ fontSize: "0.72rem", color: rolColor }}>{rolLabel}</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={s.logoutBtn}>← Salir</button>
+          <button onClick={async () => { await fetch("/api/logout", { method: "POST" }); router.replace("/login"); }} style={s.logoutBtn}>← Salir</button>
         </div>
       </aside>
 
-      {/* Main */}
       <main style={s.main}>
         <div style={s.topbar}>
           <div>
             <h1 style={s.pageTitle}>Ventas</h1>
-            <p style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
-              {ventas.length} ventas registradas
-            </p>
+            <p style={{ color: "var(--muted)", fontSize: "0.88rem" }}>{ventas.length} ventas registradas</p>
           </div>
           <button onClick={abrirModal} style={s.btnPrimary}>+ Nueva venta</button>
         </div>
 
         {success && <div style={s.successBox}>{success}</div>}
 
-        {/* Tabla de ventas */}
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
@@ -233,7 +209,6 @@ export default function VentasPage() {
         </div>
       </main>
 
-      {/* Modal nueva venta */}
       {modal && (
         <div style={s.overlay} onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div style={s.modalBox}>
@@ -241,9 +216,7 @@ export default function VentasPage() {
               <h2 style={s.modalTitle}>Nueva venta</h2>
               <button onClick={() => setModal(false)} style={s.closeBtn}>✕</button>
             </div>
-
             <form onSubmit={handleSubmit} style={s.form}>
-              {/* Datos generales */}
               <div style={s.formGrid}>
                 <div>
                   <label style={s.label}>Cliente *</label>
@@ -285,40 +258,18 @@ export default function VentasPage() {
                 </div>
               </div>
 
-              {/* Productos */}
               <div style={s.sectionTitle}>Productos</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 {items.map((item, i) => (
                   <div key={i} style={s.itemRow}>
-                    <select
-                      style={{ ...s.input, flex: 2 }}
-                      value={item.id_producto}
-                      onChange={e => updateItem(i, "id_producto", e.target.value)}
-                      required
-                    >
+                    <select style={{ ...s.input, flex: 2 }} value={item.id_producto} onChange={e => updateItem(i, "id_producto", e.target.value)} required>
                       <option value="">Producto…</option>
                       {productos.filter(p => p.estado_producto).map(p => (
-                        <option key={p.id_producto} value={p.id_producto}>
-                          {p.nombre_producto} ({p.unidad_medida})
-                        </option>
+                        <option key={p.id_producto} value={p.id_producto}>{p.nombre_producto} ({p.unidad_medida})</option>
                       ))}
                     </select>
-                    <input
-                      style={{ ...s.input, flex: "0 0 80px" }}
-                      type="number" min="0.01" step="0.01"
-                      placeholder="Cant."
-                      value={item.cantidad}
-                      onChange={e => updateItem(i, "cantidad", e.target.value)}
-                      required
-                    />
-                    <input
-                      style={{ ...s.input, flex: "0 0 100px" }}
-                      type="number" min="0" step="0.01"
-                      placeholder="Precio"
-                      value={item.precio_unitario}
-                      onChange={e => updateItem(i, "precio_unitario", e.target.value)}
-                      required
-                    />
+                    <input style={{ ...s.input, flex: "0 0 80px" }} type="number" min="0.01" step="0.01" placeholder="Cant." value={item.cantidad} onChange={e => updateItem(i, "cantidad", e.target.value)} required />
+                    <input style={{ ...s.input, flex: "0 0 100px" }} type="number" min="0" step="0.01" placeholder="Precio" value={item.precio_unitario} onChange={e => updateItem(i, "precio_unitario", e.target.value)} required />
                     <span style={{ color: "var(--green)", fontSize: "0.85rem", minWidth: 70, textAlign: "right" }}>
                       Q{(Number(item.cantidad || 0) * Number(item.precio_unitario || 0)).toFixed(2)}
                     </span>
@@ -329,16 +280,11 @@ export default function VentasPage() {
                 ))}
               </div>
 
-              <button type="button" onClick={agregarItem} style={s.btnAddItem}>
-                + Agregar producto
-              </button>
+              <button type="button" onClick={agregarItem} style={s.btnAddItem}>+ Agregar producto</button>
 
-              {/* Total */}
               <div style={s.totalRow}>
                 <span style={{ color: "var(--muted)" }}>Total estimado:</span>
-                <span style={{ fontFamily: "var(--font-head)", fontSize: "1.3rem", color: "var(--green)", fontWeight: 700 }}>
-                  Q{total.toFixed(2)}
-                </span>
+                <span style={{ fontFamily: "var(--font-head)", fontSize: "1.3rem", color: "var(--green)", fontWeight: 700 }}>Q{total.toFixed(2)}</span>
               </div>
 
               {error && <div style={s.errorBox}>⚠️ {error}</div>}
@@ -369,7 +315,7 @@ const s: Record<string, React.CSSProperties> = {
   navIcon:      { fontSize: "1rem", width: 20, textAlign: "center" },
   sidebarBottom:{ padding: "1rem", borderTop: "1px solid var(--border)" },
   userBadge:    { display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.8rem" },
-  userAvatar:   { width: 32, height: 32, borderRadius: "50%", background: "var(--accent)", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
+  userAvatar:   { width: 32, height: 32, borderRadius: "50%", color: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-head)", fontSize: "0.9rem", fontWeight: 700, flexShrink: 0 },
   logoutBtn:    { width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", padding: "0.45rem 0.75rem", fontSize: "0.82rem", cursor: "pointer", textAlign: "left" },
   main:         { flex: 1, padding: "2rem", overflowY: "auto" },
   topbar:       { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" },
